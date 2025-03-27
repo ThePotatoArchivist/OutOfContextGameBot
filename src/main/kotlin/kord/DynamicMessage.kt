@@ -11,11 +11,11 @@ import kotlinx.coroutines.flow.channelFlow
 
 abstract class DynamicMessage<D>(val id: String) {
 
-    protected fun customIdOf(componentId: String) = "$id:$componentId"
+    protected fun customId(componentId: String) = "$id:$componentId"
 
-    protected open fun content(data: D): String = ""
-    protected open fun MessageBuilder.embeds(data: D) {}
-    protected open fun MessageBuilder.components(data: D) {}
+    open fun content(data: D): String = ""
+    open fun MessageBuilder.embeds(data: D) {}
+    open fun MessageBuilder.components(data: D) {}
 
     fun MessageBuilder.send(data: D) {
         content = content(data)

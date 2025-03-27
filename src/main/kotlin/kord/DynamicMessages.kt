@@ -1,59 +1,63 @@
 package archives.tater.bot.outofcontext.kord
 
-import archives.tater.bot.outofcontext.Game
-import archives.tater.bot.outofcontext.games
+import archives.tater.bot.outofcontext.StoryState
 import dev.kord.common.entity.ButtonStyle
-import dev.kord.core.behavior.interaction.modal
+import dev.kord.core.entity.User
 import dev.kord.core.event.interaction.ComponentInteractionCreateEvent
 import dev.kord.rest.builder.message.MessageBuilder
 import dev.kord.rest.builder.message.actionRow
 
-object StartMessage : DynamicMessage<Game>("start") {
-    override fun content(data: Game): String = """
+data class LobbyState(
+    val rounds: Int,
+    val players: MutableList<User> = mutableListOf(),
+    var onStart: (suspend () -> Unit)? = null,
+    var onCancel: (suspend () -> Unit)? = null,
+)
+
+object LobbyMessage : DynamicMessage<LobbyState?>("lobby") {
+    override fun content(data: LobbyState?): String = """
         |# Out of Context
         |Players joined:
-        |${data.players.joinToString("\n") { it.mention }}
+        |${data?.players?.joinToString("\n") { it.mention } ?: "None"}
     """.trimMargin()
 
-    override fun MessageBuilder.components(data: Game) {
+    override fun MessageBuilder.components(data: LobbyState?) {
         actionRow {
-            interactionButton(ButtonStyle.Primary, customIdOf("join")) {
+            interactionButton(ButtonStyle.Primary, customId("join")) {
                 label = "Join"
-                if (data.started) disabled = true
+                if (data == null) disabled = true
             }
-            interactionButton(ButtonStyle.Danger, customIdOf("leave")) {
+            interactionButton(ButtonStyle.Danger, customId("leave")) {
                 label = "Leave"
-                if (data.started) disabled = true
+                if (data == null) disabled = true
             }
         }
         actionRow {
-            interactionButton(ButtonStyle.Primary, customIdOf("start")) {
+            interactionButton(ButtonStyle.Primary, customId("start")) {
                 label = "Start"
-                if (data.started) disabled = true
+                if (data == null) disabled = true
             }
-            interactionButton(ButtonStyle.Danger, customIdOf("cancel")) {
+            interactionButton(ButtonStyle.Danger, customId("cancel")) {
                 label = "Cancel"
-                if (data.started) disabled = true
+                if (data == null) disabled = true
             }
         }
     }
 
-    override suspend fun ComponentInteractionCreateEvent.onInteract(data: Game, componentId: String) {
+    override suspend fun ComponentInteractionCreateEvent.onInteract(data: LobbyState?, componentId: String) {
+        if (data == null) return
         when (componentId) {
             "join" -> data.players.add(interaction.user)
             "leave" -> data.players.remove(interaction.user)
             "start" -> {
-                repeat(data.players.size) {
-                    data.writings.add(mutableListOf())
-                }
-                data.started = true
-                update(data, components = true)
+                update(null, components = true)
+                data.onStart?.invoke()
                 return
             }
             "cancel" -> {
-                games.remove(interaction.message.interaction!!.id)
                 interaction.deferPublicMessageUpdate()
                 interaction.message.delete()
+                data.onCancel?.invoke()
                 return
             }
             else -> return
@@ -63,5 +67,5 @@ object StartMessage : DynamicMessage<Game>("start") {
 }
 
 val dynamicMessages = listOf(
-    StartMessage,
+    LobbyMessage,
 )
